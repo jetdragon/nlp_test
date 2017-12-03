@@ -2,11 +2,11 @@
 from flask import Flask, jsonify
 app = Flask(__name__)
 
-task = [
+tasks = [
     {
         'id': 1,
         'title': u'Buy groceries',
-        'description': u'Milk, Cheese, Pizza, Fruit, Tylenol',
+        'description': u'牛奶, Cheese, Pizza, Fruit, Tylenol',
         'done': False
     },
     {
@@ -29,4 +29,4 @@ def not_found(error):
     return jsonify({'error': 'Not Found'})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0',port=5000,debug=True)
+    app.run(host='127.0.0.1',port=5000,debug=True)
