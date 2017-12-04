@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, unicode_literals
 from configparser import ConfigParser
-from flask import jsonify, request, Flask, abort
-import json
+from flask import jsonify, request, Flask, abort, json
 
 cfg = ConfigParser()
 cfg.read('config.ini')
@@ -24,8 +23,11 @@ def nlp_sentiment():
     #     abort(400)
 
     # return json.loads(request.data.decode("gbk").encode("utf-8"))['0']
-    json_dict = json.loads(request.get_data().decode("gbk"))
-    return jsonify(str(json_dict['0']['Text']))
+    # json_dict = json.loads(request.get_data().decode("gbk"))
+    # return jsonify(str(json_dict['0']['Text']))
+    # return request.get_json()
+    #return json.dumps(str(request.get_data()), ensure_ascii=False)
+    return json.loads(str(request.get_data()))
 
 if __name__ == '__main__':
     nlp.run(host=rest_host, port=rest_port, debug=True)
