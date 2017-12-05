@@ -2,7 +2,13 @@
 from __future__ import print_function, unicode_literals
 from configparser import ConfigParser
 from flask import jsonify, request, Flask, abort, json
+import sys
 
+#define a function to display msg into console(stderr)
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+#read config file    
 cfg = ConfigParser()
 cfg.read('config.ini')
 
@@ -19,15 +25,15 @@ nlp_str = []
 
 @nlp.route('/nlp/sentiment', methods=['POST'])
 def nlp_sentiment():
-    # if not request.json :
-    #     abort(400)
 
-    # return json.loads(request.data.decode("gbk").encode("utf-8"))['0']
-    # json_dict = json.loads(request.get_data().decode("gbk"))
-    # return jsonify(str(json_dict['0']['Text']))
-    # return request.get_json()
-    #return json.dumps(str(request.get_data()), ensure_ascii=False)
-    return json.loads(str(request.get_data()))
+    if not request.json :
+        abort(400)
 
+    json_dict = request.json
+    for k, v in json_dict.items():
+        eprint(k, v['Text'])
+
+    return jsonify(str(json_dict['0']['Text']))
+    
 if __name__ == '__main__':
     nlp.run(host=rest_host, port=rest_port, debug=True)

@@ -38,9 +38,11 @@ class web_json:
      
     # post方法
     def url_post(self, params, data):
-        data=bytes(data, 'utf8')
+        # data=bytes(data, 'utf8')
         return self.get_url_data(params, data)
 
 web = web_json("http://127.0.0.1:5000")
-params = "/todo/api/v1.0/tasks/1"
-web.url_get(params)    
+params = "/nlp/sentiment"
+data = open('newsSet.json', 'rb').read()
+# web.url_get(params)    
+web.url_post(params, data)
