@@ -42,7 +42,8 @@ class web_json:
         return self.get_url_data(params, data)
 
 web = web_json("http://127.0.0.1:5000")
-params = "/nlp/sentiment"
-data = open('newsSet.json', 'rb').read()
-# web.url_get(params)    
-web.url_post(params, data)
+# params = "/nlp/sentiment"
+params = "/search/letv"
+# data = open('newsSet.json', 'rb').read()
+web.url_get(params)    
+# web.url_post(params, data)
