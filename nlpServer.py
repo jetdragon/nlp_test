@@ -14,6 +14,9 @@ import urllib
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+# def return_result(*args):
+#     return args
+
 #read config file    
 cfg = ConfigParser()
 cfg.read('config.ini')
@@ -82,6 +85,8 @@ def WNspider():
         abort(400)
         
     newsSet = []
+    global spyder_result
+    spyder_result = []
 
     for page in range(1, 2):
         # newsurl = 'http://search.sina.com.cn/?q={0}&c=news&from=channel&ie=utf-8'.format(kw)
@@ -105,10 +110,13 @@ def WNspider():
 
     df = pandas.DataFrame(newsSet)
     df.columns = ['Tile', 'Date','Source', 'Text']
-    spyder_result = df.to_json(path_or_buf=None, orient='index', force_ascii=False)
+    # global spyder_result 
+    # spyder_result = df.to_json(path_or_buf=None, orient='index', force_ascii=False)
+    spyder_result.append(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
     # eprint(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
     json_dict = df.to_dict(orient='index')
-    return nlp_sentiment(json_dict)
+    # return nlp_sentiment(json_dict)
+    return 'Done'
 
 @nlpServer.route('/nlp/sentiment', methods=['POST'])
 def nlpServer_sentiment():
@@ -119,6 +127,16 @@ def nlpServer_sentiment():
 
     json_dict = request.json
     return nlp_sentiment(json_dict)
+
+@nlpServer.route('/spyder/result', methods=['GET'])
+def nlpServer_spyder_result():
+    if 'pageNumber' in request.args:
+        pageNumber = int(float(request.args['pageNumber']))
+    else:
+        abort(400)
+    eprint(spyder_result[pageNumber-1])
+    eprint(pageNumber)
+    return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 def nlp_sentiment(json_dict):   
     for k, v in json_dict.items():
