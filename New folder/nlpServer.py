@@ -10,9 +10,6 @@ import requests
 import pandas
 import urllib
 
-import elasticsearch
-from elasticsearch import helpers
-
 #define a function to display msg into console(stderr)
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -28,28 +25,6 @@ sec = cfg.sections()
 token = cfg.get('nlp','nlp_token')
 rest_host = cfg.get('server','host')
 rest_port = int(float(cfg.get('server', 'port')))
-
-#read ES config, create ES connection
-es_host = cfg.get('elastic_search','es_host')
-es_port = int(float(cfg.get('elastic_search', 'es_port')))
-es = elasticsearch.Elasticsearch([{'host': es_host, 'port': es_port}])
-
-# document = {
-#     "_index":"",
-#     "_type":"",
-#     "_id":"",
-#     "_source":""
-#     }
-action = []
-
-# def create_doc(_index,_type,_id,_source):
-def create_doc(_index,_type,_source):
-  oneindex = dict()
-  oneindex['_index'] = _index
-  oneindex['_type'] = _type
-#   oneindex['_id'] =  _id
-  oneindex['_source'] = _source
-  action.append(oneindex)
 
 #REST API server
 nlpServer = Flask(__name__)
@@ -131,37 +106,17 @@ def WNspider():
 
             content = getNewsDetails(link)
             newsSet.append([h2, content[0], content[1], content[2]])
-            # print(content)
+            print(content)
 
     df = pandas.DataFrame(newsSet)
-    # eprint(df)
-    df.columns = ['Title', 'Date','Source', 'Text']
+    df.columns = ['Tile', 'Date','Source', 'Text']
     # global spyder_result 
     # spyder_result = df.to_json(path_or_buf=None, orient='index', force_ascii=False)
     spyder_result.append(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
     # eprint(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
-    global json_dict
     json_dict = df.to_dict(orient='index')
-    # eprint(json_dict)
-    nlp_list = nlp_sentiment(json_dict)
-    for i in nlp_list:
-        # eprint(i)
-        source = {
-            "key" : kw,
-            "id": i['id'],
-            'title' : i['title'],
-            'text' : i['text'],
-            'timestamp' : i['timestamp'],
-            'positive_prob' : i['positive_prob'],
-            'negative_prob' : i['negative_prob'],
-            'source' : i['source']
-        }
-        # eprint(source)
-        # create_doc("risk3","line",i['id']+1,source)
-        create_doc("risk3","line",source)
-        # eprint(action)
-    helpers.bulk(es,action)
-    return jsonify(nlp_list), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    # return nlp_sentiment(json_dict)
+    return 'Done'
 
 @nlpServer.route('/nlp/sentiment', methods=['POST'])
 def nlpServer_sentiment():
@@ -183,27 +138,26 @@ def nlpServer_spyder_result():
     eprint(pageNumber)
     return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
 
-def nlp_sentiment(json_dict):
-    # eprint(json_dict)   
+def nlp_sentiment(json_dict):   
     for k, v in json_dict.items():
         # eprint(k, v['Text'])
         result = nlp.sentiment(v['Text'])
         # timestamp = nlp.convert_time(v['Date'])
-        # eprint(result[0][0],result[0][1])
+        # eprint(result[0][0],result[0][1],timestamp)
         nlp_item = {
-        'id' : k,
-        'title' : v['Title'],
+        'log_id' : k,
+        'keyword' : v['Tile'],
         'text' : v['Text'],
         'timestamp' : v['Date'],
         'positive_prob' : result[0][0],
         'negative_prob' : result[0][1],
-        'source' : v['Source']
+        'status' : 'WIP'
         }
         # eprint(nlp_item)
         nlp_result.append(nlp_item)
         
-    # print(jsonify(nlp_result))
-    return nlp_result
+    # eprint(jsonify(nlp_result))
+    return jsonify(nlp_result)
     
 if __name__ == '__main__':
     nlpServer.run(host=rest_host, port=rest_port, debug=True)
