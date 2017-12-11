@@ -32,6 +32,9 @@ rest_port = int(float(cfg.get('server', 'port')))
 #read ES config, create ES connection
 es_host = cfg.get('elastic_search','es_host')
 es_port = int(float(cfg.get('elastic_search', 'es_port')))
+es_index = cfg.get('elastic_search','es_index')
+es_type = cfg.get('elastic_search','es_type')
+
 es = elasticsearch.Elasticsearch([{'host': es_host, 'port': es_port}])
 
 # document = {
@@ -59,8 +62,11 @@ nlp_result = []
 nlp = BosonNLP(token)
 
 def getNewsDetails(link):
-    subres = requests.get(link)
-    subres.encoding = 'utf-8'
+    try:
+        subres = requests.get(link)
+        subres.encoding = 'utf-8'
+    except Exception:
+        return ['2017年','新浪新闻','新浪新闻']
 
     ssoup = BeautifulSoup(subres.text, 'html.parser')
     pList = ssoup.select('#artibody p')  # .article
@@ -108,7 +114,8 @@ def WNspider():
         kw = request.args['key']
     else:
         abort(400)
-        
+
+    eprint('Begin to search key :', kw)    
     newsSet = []
     global spyder_result
     spyder_result = []
@@ -147,8 +154,8 @@ def WNspider():
     for i in nlp_list:
         # eprint(i)
         source = {
-            "key" : kw,
-            "id": i['id'],
+            'key' : kw,
+            'id': i['id'],
             'title' : i['title'],
             'text' : i['text'],
             'timestamp' : i['timestamp'],
@@ -158,10 +165,11 @@ def WNspider():
         }
         # eprint(source)
         # create_doc("risk3","line",i['id']+1,source)
-        create_doc("risk3","line",source)
+        create_doc(es_index,es_type,source)
         # eprint(action)
     helpers.bulk(es,action)
-    return jsonify(nlp_list), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    # return jsonify(nlp_list), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    return jsonify({'key':kw, 'status':'Done'}), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 @nlpServer.route('/nlp/sentiment', methods=['POST'])
 def nlpServer_sentiment():
@@ -179,9 +187,15 @@ def nlpServer_spyder_result():
         pageNumber = int(float(request.args['pageNumber']))
     else:
         abort(400)
-    eprint(spyder_result[pageNumber-1])
-    eprint(pageNumber)
-    return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
+
+    try:
+        return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
+    except IndexError:
+        abort(500)
+    
+    # eprint(spyder_result[pageNumber-1])
+    # eprint(pageNumber)
+    # return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 def nlp_sentiment(json_dict):
     # eprint(json_dict)   
