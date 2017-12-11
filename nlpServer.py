@@ -28,6 +28,7 @@ sec = cfg.sections()
 token = cfg.get('nlp','nlp_token')
 rest_host = cfg.get('server','host')
 rest_port = int(float(cfg.get('server', 'port')))
+page_limit = int(float(cfg.get('search', 'page_limit')))
 
 #read ES config, create ES connection
 es_host = cfg.get('elastic_search','es_host')
@@ -115,12 +116,13 @@ def WNspider():
     else:
         abort(400)
 
-    eprint('Begin to search key :', kw)    
+    print('***** Begin to search key :', kw)    
     newsSet = []
     global spyder_result
     spyder_result = []
 
-    for page in range(1, 2):
+    for page in range(1, page_limit):
+        print('***** Get page [', page, '] data')
         # newsurl = 'http://search.sina.com.cn/?q={0}&c=news&from=channel&ie=utf-8'.format(kw)
         newsurl = 'http://search.sina.com.cn/?q={}&c=news&from=channel&ie=utf-8&col=&range=&source=&country=\
         &size=&time=&a=&page={}&pf=2131425464&ps=2134309112&dpc=1'.format(urllib.parse.quote(kw), page)
@@ -140,35 +142,39 @@ def WNspider():
             newsSet.append([h2, content[0], content[1], content[2]])
             # print(content)
 
-    df = pandas.DataFrame(newsSet)
-    # eprint(df)
-    df.columns = ['Title', 'Date','Source', 'Text']
-    # global spyder_result 
-    # spyder_result = df.to_json(path_or_buf=None, orient='index', force_ascii=False)
-    spyder_result.append(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
-    # eprint(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
-    global json_dict
-    json_dict = df.to_dict(orient='index')
-    # eprint(json_dict)
-    nlp_list = nlp_sentiment(json_dict)
-    for i in nlp_list:
-        # eprint(i)
-        source = {
-            'key' : kw,
-            'id': i['id'],
-            'title' : i['title'],
-            'text' : i['text'],
-            'timestamp' : i['timestamp'],
-            'positive_prob' : i['positive_prob'],
-            'negative_prob' : i['negative_prob'],
-            'source' : i['source']
-        }
-        # eprint(source)
-        # create_doc("risk3","line",i['id']+1,source)
-        create_doc(es_index,es_type,source)
-        # eprint(action)
-    helpers.bulk(es,action)
-    # return jsonify(nlp_list), 200, {'Content-Type': 'application/json; charset=utf-8'}
+        df = pandas.DataFrame(newsSet)
+        # eprint(df)
+        df.columns = ['Title', 'Date','Source', 'Text']
+        # global spyder_result 
+        # spyder_result = df.to_json(path_or_buf=None, orient='index', force_ascii=False)
+        spyder_result.append(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
+        # eprint(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
+        global json_dict
+        json_dict = df.to_dict(orient='index')
+        # eprint(json_dict)
+        print('***** Begin to get page [', page, '] nlp')
+        nlp_list = nlp_sentiment(json_dict)
+        print('***** Page [', page, '] nlp done')
+        print('***** Begin to update page [', page, '] to ES')
+        for i in nlp_list:
+            # eprint(i)
+            source = {
+                'key' : kw,
+                'id': i['id'],
+                'title' : i['title'],
+                'text' : i['text'],
+                'timestamp' : i['timestamp'],
+                'positive_prob' : i['positive_prob'],
+                'negative_prob' : i['negative_prob'],
+                'source' : i['source']
+            }
+            # eprint(source)
+            # create_doc("risk3","line",i['id']+1,source)
+            create_doc(es_index,es_type,source)
+            # eprint(action)
+        helpers.bulk(es,action)
+        print('***** Update page [', page, '] to ES done')
+        # return jsonify(nlp_list), 200, {'Content-Type': 'application/json; charset=utf-8'}
     return jsonify({'key':kw, 'status':'Done'}), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 @nlpServer.route('/nlp/sentiment', methods=['POST'])
@@ -187,9 +193,11 @@ def nlpServer_spyder_result():
         pageNumber = int(float(request.args['pageNumber']))
     else:
         abort(400)
-
+    s_len = len(spyder_result)
+    r = 0 - s_len
+    print(s_len,r)
     try:
-        return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
+        return spyder_result.pop(r), 200, {'Content-Type': 'application/json; charset=utf-8'}
     except IndexError:
         abort(500)
     
