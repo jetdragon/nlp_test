@@ -26,6 +26,7 @@ cfg.read('config.ini')
 
 sec = cfg.sections()
 token = cfg.get('nlp','nlp_token')
+model = cfg.get('nlp','nlp_model')
 rest_host = cfg.get('server','host')
 rest_port = int(float(cfg.get('server', 'port')))
 page_limit = int(float(cfg.get('search', 'page_limit')))
@@ -53,7 +54,8 @@ def create_doc(_index,_type,_source):
   oneindex['_type'] = _type
 #   oneindex['_id'] =  _id
   oneindex['_source'] = _source
-  action.append(oneindex)
+#   action.append(oneindex)
+  return oneindex
 
 #REST API server
 nlpServer = Flask(__name__)
@@ -117,11 +119,16 @@ def WNspider():
         abort(400)
 
     print('***** Begin to search key :', kw)    
-    newsSet = []
+  
     global spyder_result
     spyder_result = []
+    global json_dict
+    json_dict = dict()
 
     for page in range(1, page_limit):
+        # action = []
+        newsSet = []
+        action = []
         print('***** Get page [', page, '] data')
         # newsurl = 'http://search.sina.com.cn/?q={0}&c=news&from=channel&ie=utf-8'.format(kw)
         newsurl = 'http://search.sina.com.cn/?q={}&c=news&from=channel&ie=utf-8&col=&range=&source=&country=\
@@ -142,6 +149,11 @@ def WNspider():
             newsSet.append([h2, content[0], content[1], content[2]])
             # print(content)
 
+        # print('content: ',content)    
+        if len(newsSet) == 0:
+            print ('***** Key :', kw, 'Not found')
+            return jsonify({'key':kw, 'status':'NotFound'}), 200, {'Content-Type': 'application/json; charset=utf-8'}
+
         df = pandas.DataFrame(newsSet)
         # eprint(df)
         df.columns = ['Title', 'Date','Source', 'Text']
@@ -149,13 +161,16 @@ def WNspider():
         # spyder_result = df.to_json(path_or_buf=None, orient='index', force_ascii=False)
         spyder_result.append(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
         # eprint(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
-        global json_dict
         json_dict = df.to_dict(orient='index')
         # eprint(json_dict)
+        print('json dict number :',len(json_dict))
         print('***** Begin to get page [', page, '] nlp')
         nlp_list = nlp_sentiment(json_dict)
+        print('nlp list number :',len(nlp_list))
+        # print(nlp_list)
         print('***** Page [', page, '] nlp done')
         print('***** Begin to update page [', page, '] to ES')
+        
         for i in nlp_list:
             # eprint(i)
             source = {
@@ -170,9 +185,13 @@ def WNspider():
             }
             # eprint(source)
             # create_doc("risk3","line",i['id']+1,source)
-            create_doc(es_index,es_type,source)
-            # eprint(action)
+            es_data = create_doc(es_index,es_type,source)
+            # print(action)
+            action.append(es_data)
+        print('action length :',len(action))
+        # eprint(action)
         helpers.bulk(es,action)
+
         print('***** Update page [', page, '] to ES done')
         # return jsonify(nlp_list), 200, {'Content-Type': 'application/json; charset=utf-8'}
     return jsonify({'key':kw, 'status':'Done'}), 200, {'Content-Type': 'application/json; charset=utf-8'}
@@ -195,6 +214,7 @@ def nlpServer_spyder_result():
         abort(400)
     s_len = len(spyder_result)
     r = 0 - s_len
+    print('Page number :', pageNumber)
     print(s_len,r)
     try:
         return spyder_result.pop(r), 200, {'Content-Type': 'application/json; charset=utf-8'}
@@ -206,10 +226,11 @@ def nlpServer_spyder_result():
     # return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 def nlp_sentiment(json_dict):
-    # eprint(json_dict)   
+    # eprint(json_dict)
+    nlp_result = []   
     for k, v in json_dict.items():
         # eprint(k, v['Text'])
-        result = nlp.sentiment(v['Text'])
+        result = nlp.sentiment(v['Text'],model=model)
         # timestamp = nlp.convert_time(v['Date'])
         # eprint(result[0][0],result[0][1])
         nlp_item = {
@@ -223,8 +244,9 @@ def nlp_sentiment(json_dict):
         }
         # eprint(nlp_item)
         nlp_result.append(nlp_item)
-        
-    # print(jsonify(nlp_result))
+
+    print('nlp result length :', len(nlp_result))    
+    # print('nlp result:',jsonify(nlp_result))
     return nlp_result
     
 if __name__ == '__main__':
