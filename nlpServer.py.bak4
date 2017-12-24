@@ -124,7 +124,6 @@ def WNspider():
     spyder_result = []
     global json_dict
     json_dict = dict()
-    h2 = ' '
 
     for page in range(1, page_limit):
         # action = []
@@ -144,11 +143,11 @@ def WNspider():
         for div in dList:
             h2 = div.select('h2 a')[0].text
             link = div.select('a')[0]['href']
-            # source = div.select('.fgray_time')[0].text   
-            if h2 != ' ':        
-                content = getNewsDetails(link)
-                newsSet.append([h2, content[0], content[1], content[2]])
-                # print(content)
+            # source = div.select('.fgray_time')[0].text
+
+            content = getNewsDetails(link)
+            newsSet.append([h2, content[0], content[1], content[2]])
+            # print(content)
 
         # print('content: ',content)    
         if len(newsSet) == 0:

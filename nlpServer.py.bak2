@@ -26,17 +26,12 @@ cfg.read('config.ini')
 
 sec = cfg.sections()
 token = cfg.get('nlp','nlp_token')
-model = cfg.get('nlp','nlp_model')
 rest_host = cfg.get('server','host')
 rest_port = int(float(cfg.get('server', 'port')))
-page_limit = int(float(cfg.get('search', 'page_limit')))
 
 #read ES config, create ES connection
 es_host = cfg.get('elastic_search','es_host')
 es_port = int(float(cfg.get('elastic_search', 'es_port')))
-es_index = cfg.get('elastic_search','es_index')
-es_type = cfg.get('elastic_search','es_type')
-
 es = elasticsearch.Elasticsearch([{'host': es_host, 'port': es_port}])
 
 # document = {
@@ -54,8 +49,7 @@ def create_doc(_index,_type,_source):
   oneindex['_type'] = _type
 #   oneindex['_id'] =  _id
   oneindex['_source'] = _source
-#   action.append(oneindex)
-  return oneindex
+  action.append(oneindex)
 
 #REST API server
 nlpServer = Flask(__name__)
@@ -65,11 +59,8 @@ nlp_result = []
 nlp = BosonNLP(token)
 
 def getNewsDetails(link):
-    try:
-        subres = requests.get(link)
-        subres.encoding = 'utf-8'
-    except Exception:
-        return ['2017年','新浪新闻','新浪新闻']
+    subres = requests.get(link)
+    subres.encoding = 'utf-8'
 
     ssoup = BeautifulSoup(subres.text, 'html.parser')
     pList = ssoup.select('#artibody p')  # .article
@@ -117,20 +108,12 @@ def WNspider():
         kw = request.args['key']
     else:
         abort(400)
-
-    print('***** Begin to search key :', kw)    
-  
+        
+    newsSet = []
     global spyder_result
     spyder_result = []
-    global json_dict
-    json_dict = dict()
-    h2 = ' '
 
-    for page in range(1, page_limit):
-        # action = []
-        newsSet = []
-        action = []
-        print('***** Get page [', page, '] data')
+    for page in range(1, 2):
         # newsurl = 'http://search.sina.com.cn/?q={0}&c=news&from=channel&ie=utf-8'.format(kw)
         newsurl = 'http://search.sina.com.cn/?q={}&c=news&from=channel&ie=utf-8&col=&range=&source=&country=\
         &size=&time=&a=&page={}&pf=2131425464&ps=2134309112&dpc=1'.format(urllib.parse.quote(kw), page)
@@ -144,58 +127,41 @@ def WNspider():
         for div in dList:
             h2 = div.select('h2 a')[0].text
             link = div.select('a')[0]['href']
-            # source = div.select('.fgray_time')[0].text   
-            if h2 != ' ':        
-                content = getNewsDetails(link)
-                newsSet.append([h2, content[0], content[1], content[2]])
-                # print(content)
+            # source = div.select('.fgray_time')[0].text
 
-        # print('content: ',content)    
-        if len(newsSet) == 0:
-            print ('***** Key :', kw, 'Not found')
-            return jsonify({'key':kw, 'status':'NotFound'}), 200, {'Content-Type': 'application/json; charset=utf-8'}
+            content = getNewsDetails(link)
+            newsSet.append([h2, content[0], content[1], content[2]])
+            # print(content)
 
-        df = pandas.DataFrame(newsSet)
-        # eprint(df)
-        df.columns = ['Title', 'Date','Source', 'Text']
-        # global spyder_result 
-        # spyder_result = df.to_json(path_or_buf=None, orient='index', force_ascii=False)
-        spyder_result.append(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
-        # eprint(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
-        json_dict = df.to_dict(orient='index')
-        # eprint(json_dict)
-        print('json dict number :',len(json_dict))
-        print('***** Begin to get page [', page, '] nlp')
-        nlp_list = nlp_sentiment(json_dict)
-        print('nlp list number :',len(nlp_list))
-        # print(nlp_list)
-        print('***** Page [', page, '] nlp done')
-        print('***** Begin to update page [', page, '] to ES')
-        
-        for i in nlp_list:
-            # eprint(i)
-            source = {
-                'key' : kw,
-                'id': i['id'],
-                'title' : i['title'],
-                'text' : i['text'],
-                'timestamp' : i['timestamp'],
-                'positive_prob' : i['positive_prob'],
-                'negative_prob' : i['negative_prob'],
-                'source' : i['source']
-            }
-            # eprint(source)
-            # create_doc("risk3","line",i['id']+1,source)
-            es_data = create_doc(es_index,es_type,source)
-            # print(action)
-            action.append(es_data)
-        print('action length :',len(action))
+    df = pandas.DataFrame(newsSet)
+    # eprint(df)
+    df.columns = ['Title', 'Date','Source', 'Text']
+    # global spyder_result 
+    # spyder_result = df.to_json(path_or_buf=None, orient='index', force_ascii=False)
+    spyder_result.append(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
+    # eprint(df.to_json(path_or_buf=None, orient='index', force_ascii=False))
+    global json_dict
+    json_dict = df.to_dict(orient='index')
+    # eprint(json_dict)
+    nlp_list = nlp_sentiment(json_dict)
+    for i in nlp_list:
+        # eprint(i)
+        source = {
+            "key" : kw,
+            "id": i['id'],
+            'title' : i['title'],
+            'text' : i['text'],
+            'timestamp' : i['timestamp'],
+            'positive_prob' : i['positive_prob'],
+            'negative_prob' : i['negative_prob'],
+            'source' : i['source']
+        }
+        # eprint(source)
+        # create_doc("risk3","line",i['id']+1,source)
+        create_doc("risk3","line",source)
         # eprint(action)
-        helpers.bulk(es,action)
-
-        print('***** Update page [', page, '] to ES done')
-        # return jsonify(nlp_list), 200, {'Content-Type': 'application/json; charset=utf-8'}
-    return jsonify({'key':kw, 'status':'Done'}), 200, {'Content-Type': 'application/json; charset=utf-8'}
+    helpers.bulk(es,action)
+    return jsonify(nlp_list), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 @nlpServer.route('/nlp/sentiment', methods=['POST'])
 def nlpServer_sentiment():
@@ -213,25 +179,15 @@ def nlpServer_spyder_result():
         pageNumber = int(float(request.args['pageNumber']))
     else:
         abort(400)
-    s_len = len(spyder_result)
-    r = 0 - s_len
-    print('Page number :', pageNumber)
-    print(s_len,r)
-    try:
-        return spyder_result.pop(r), 200, {'Content-Type': 'application/json; charset=utf-8'}
-    except IndexError:
-        abort(500)
-    
-    # eprint(spyder_result[pageNumber-1])
-    # eprint(pageNumber)
-    # return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
+    eprint(spyder_result[pageNumber-1])
+    eprint(pageNumber)
+    return spyder_result[pageNumber-1], 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 def nlp_sentiment(json_dict):
-    # eprint(json_dict)
-    nlp_result = []   
+    # eprint(json_dict)   
     for k, v in json_dict.items():
         # eprint(k, v['Text'])
-        result = nlp.sentiment(v['Text'],model=model)
+        result = nlp.sentiment(v['Text'])
         # timestamp = nlp.convert_time(v['Date'])
         # eprint(result[0][0],result[0][1])
         nlp_item = {
@@ -245,9 +201,8 @@ def nlp_sentiment(json_dict):
         }
         # eprint(nlp_item)
         nlp_result.append(nlp_item)
-
-    print('nlp result length :', len(nlp_result))    
-    # print('nlp result:',jsonify(nlp_result))
+        
+    # print(jsonify(nlp_result))
     return nlp_result
     
 if __name__ == '__main__':

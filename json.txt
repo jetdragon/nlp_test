@@ -1,0 +1,5 @@
+POST /risk/_bulk?pretty
+{"index": {"_index": "risk","_type":"line","_id":1}}
+{"id":1,"keyword":"microsoft","timestamp":"2017-12-08T07:03:11+00:00","positive_prob":0.631,"negative_prob":0.252,"title":"title xxxx 1","data":"2017 11 12","source":"abc","text":"xxxx 1"}
+{"index": {"_index": "risk","_type":"line","_id":2}}
+{"id":2,"keyword":"microsoft","timestamp":"2017-12-08T07:13:11+00:00","positive_prob":0.531,"negative_prob":0.222,"title":"title xxxx 2","data":"2017 11 15","source":"abc","text":"xxxx 2"}
